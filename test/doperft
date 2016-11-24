@@ -1,0 +1,12 @@
+TS='taskset 2' # set CPU affinity to core #1
+
+[ "$1" = "nobulk" ] || bulk=-b
+$TS perft ${bulk} -c 11 
+echo "expected:"
+echo "perft(11) 1665861398 nodes"
+$TS perft ${bulk} -c 9 B:W6,9,10,11,20,21,22,23,30,K31,33,37,41,42,43,44,46:BK17,K24
+echo "expected:"
+echo "perft(9) 1216917193 nodes"
+$TS perft ${bulk} -c 15 W:W25,27,28,30,32,33,34,35,37,38:B12,13,14,16,18,19,21,23,24,26
+echo "expected:"
+echo "perft(15) 346184885 nodes"

@@ -1,0 +1,15 @@
+Compiling Moby Dam in Linux
+
+  For gcc 64-bit:
+  In the 'main' subdirectory, give command 'make'.
+
+Compiling Moby Dam in Windows
+
+  If you use Cygwin 64-bit:
+  In the 'main' subdirectory, give command 'make'.
+
+  If you use Mingw-w64:
+  In the 'main' subdirectory, give command 'make win'.
+
+  If you use Visual Studio Express 2013:
+  In the 'win' subdirectory, doubleclick 'mobydam.sln'.

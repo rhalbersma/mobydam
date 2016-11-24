@@ -1,0 +1,42 @@
+Usage: mobydam [-b bookfile] [-e dbdir] [-t exp] [-z] [-c host ] [-p port] [-f format] [-m msgfile] [-l logfile] [-o FEN]
+Engine settings:
+  -b bookfile = file name of opening book
+       (default: book.opn)
+  -e dbdir = directory holding database files
+       (or multiple [semi]colon-separated directories)
+       (default: current directory)
+  -t exp = exponent of transposition table size, 20..30
+       (default: 25 = 2^25 entries = 512MiB)
+  -z = do pondering (search while awaiting opponent move)
+DamExchange options:
+  -c host = connect to host (dns name or ip address)
+       (default: listen instead of connect)
+  -p port = port number to use
+       (default: 27531)
+Log options:
+  -f format = format of pdn log filenames
+       %d in format is replaced by 0, 1, 2 or 3
+       where 0=unknown, 1=loss, 2=draw, 3=win for engine
+       (default: result%d.pdn)
+  -m msgfile = DamExchange message log filename
+       (default: dxp.log)
+  -l logfile = engine output log filename
+       (default: engine.log)
+Profiling: (used during building of optimized version)
+  -o FEN = position to search during 10s, then exit
+
+
+Available console commands are:
+exit         terminate program
+end          force sending a gameend
+chat <text>  send chat text to opponent
+indb         in-database position ends game (toggle)
+draw         regulation draw ends game (toggle)
+wipe         wipe transposition table before each game (toggle)
+delay        short delay before first move (toggle)
+depth <n>    set iterative search depth limit (0=no limit)
+time <n>     set hard time limit per move (in ms) (0=no limit)
+checkend     check endgame database files
+debug        log lots of extra debug info (toggle) (debug build)
+verbose      log extra search info (toggle)
+help         show this help text
