@@ -25,6 +25,7 @@ typedef union {
         bool gamereq : 1;
         bool move    : 1;
         bool gameend : 1;
+        bool backreq : 1;
         bool cmdexit : 1;
         bool cmdend  : 1;
     };
@@ -46,7 +47,6 @@ extern u32 test_time;        /* max search time per move (ms) */
 extern int our_side;         /* engine's side in the game */
 extern bool game_inprog;     /* game in progress */
 extern int side_moving;      /* side to move in current root position */
-extern int move_number;      /* the current move number */
 extern int game_number;      /* game number in current connection */
 extern int game_result;      /* from gameend */
 extern char pdn_format[];    /* pdn log filename format */

@@ -35,6 +35,7 @@ int playtime_period;        /* time available for game, in milliseconds */
 int timeleft_moves;         /* remaining moves */
 int timeleft_period;        /* remaining time for self, in ms */
 int timeleft_opponent;      /* remaining time for other player, in ms */
+int oppmoves_first;         /* remaining opponent moves adjustment */
 u32 move_time;              /* nominal think time for engine */
 
 int test_depth;             /* max iterative search depth */
@@ -54,6 +55,7 @@ char com_buf[COMBUFLEN];    /* incoming message buffer */
 char gr_buf[COMBUFLEN];     /* received gamereq msg */
 char mv_buf[COMBUFLEN];     /* received move msg */
 char ge_buf[COMBUFLEN];     /* received gameend msg */
+char br_buf[COMBUFLEN];     /* received backreq msg */
 int game_result;            /* from perspective of engine */
 char *gameend_text[] =      /* for received gameend */
     {"", "(loss)", "(draw)", "(win)", "?", "?", "?", "?", "?", "?"};
@@ -259,6 +261,18 @@ static void send_chat(char *str)
     tcp_send(buf, strlen(buf) + 1); /* including endcode */
 }
 
+/* send DamExchange takeback accept */
+/* accept = acceptance code */
+static void send_backacc(int accept)
+{
+    char buf[COMBUFLEN];
+
+    buf[0] = 'K';
+    buf[1] = accept + '0';
+    buf[2] = '\0';
+    tcp_send(buf, 3);
+}
+
 /* interpret received console command */
 /* buf -> incoming console command, including terminator */
 /* len = buf length */
@@ -396,7 +410,8 @@ static void rcv_dxpmsg(void)
         }
         break;
     case 'B':                       /* backreq */
-        tcp_send("K1", 3);          /* we don't support it */
+        strcpy(br_buf, com_buf);    /* save for later examination */
+        main_event.backreq = TRUE;
         break;
     case 'K':                       /* backacc */
         break;                      /* ignore, we don't send backreq */
@@ -855,6 +870,56 @@ static int rcv_gameend(int *reasonptr)
     return cnv_num(&ge_buf[2], 1);
 }
 
+/* handle received DamExchange takeback request */
+/* in/out: bbp = pptr to move chain */
+/* returns: TRUE if successful */
+static bool rcv_backreq(bitboard **bbp)
+{
+    bitboard *bb, *parent;
+    int movenr, side;
+    int n, s;
+
+    if (!game_inprog || strlen(br_buf) < 5)
+    {
+        return FALSE;
+    }
+    movenr = cnv_num(&br_buf[1], 3);   /* target move number */
+    side = (br_buf[4] == 'W') ? W : B; /* target side to move */
+    n = move_number;
+    s = side_moving;
+    if (movenr > n || (movenr == n && side > s))
+    {
+        return FALSE;                  /* can't go forward */
+    }
+    bb = *bbp;
+    while (bb != NULL && (n > movenr || s != side))
+    {
+        if (s == W)
+        {
+            n--;
+        }
+        s = W + B - s;
+        bb = bb->parent;               /* walk back along the move chain */
+    }
+    if (bb == NULL)
+    {                                  /* walked past the first move? */
+        return FALSE;
+    }
+    while (bb != *bbp)                 /* free the taken-back moves */
+    {
+        parent = (*bbp)->parent;
+        free(*bbp);
+        *bbp = parent;
+    }
+    move_number = n;
+    side_moving = s;
+    timeleft_moves = playtime_moves - n + 1;  /* adjust remaining moves */
+    /* as backreq is intended for correcting operator mistakes, */
+    /* the remaining time does not need to be adjusted */
+    move_tick = get_tick();                   /* reset time for current move */
+    return TRUE;
+}
+
 /* free whole board chain of played moves */
 /* bb -> current bitboard, representing the most recent move, */
 /* with 'parent' reference to previous move in the chain */
@@ -951,7 +1016,6 @@ static void main_loop(void)
             /* add the move to the chain of played moves */
             bb = alloc_bb(list.move[m]);
 
-            log_pdnmove(&list, m);
             printf("move received from %s\nmove=%d%s ", opponent_name,
                    move_number, (side_moving == W) ? "." : "...");
             print_move_long(&list, m);
@@ -967,7 +1031,7 @@ static void main_loop(void)
             strcpy(nrmoves, "unlimited");
             if (playtime_moves > 0)
             {
-                sprintf(nrmoves, "%d", timeleft_moves);
+                sprintf(nrmoves, "%d", timeleft_moves - oppmoves_first);
             }
             printf("opponent used %u ms, leaving %d ms for %s moves\n",
                    used, timeleft_opponent, nrmoves);
@@ -1091,6 +1155,7 @@ static void main_loop(void)
                 game_inprog = TRUE;
                 ponder_state = do_pondering;
                 lastresult = 0;
+                oppmoves_first = (side_moving == our_side) ? 0 : 1;
                 if (test_delay && side_moving == our_side)
                 {
                     /* some opponent engines like a bit of delay */
@@ -1099,6 +1164,24 @@ static void main_loop(void)
                 }
             }
             main_event.gamereq = FALSE;
+            continue;
+        }
+        if (main_event.backreq)
+        {
+            if (rcv_backreq(&bb))
+            {
+                printf("backreq accepted to move %d\n", move_number);
+                print_board(bb);
+                send_backacc(0);
+            }
+            else
+            {
+                sprintf(msg, "invalid backreq message received");
+                puts(msg);
+                send_chat(msg);
+                send_backacc(2);
+            }
+            main_event.backreq = FALSE;
             continue;
         }
         if (main_event.cmdexit)
@@ -1275,7 +1358,6 @@ static void main_loop(void)
             /* add the move to the chain of played moves */
             bb = alloc_bb(list.move[0]);
 
-            log_pdnmove(&list, 0);
             printf("move=%d%s ", move_number, (side_moving == W) ? "." : "...");
             print_move_long(&list, 0);
             printf("\n");

@@ -445,7 +445,6 @@ static void genmoves_capt(bitboard *bb, movelist *listptr)
 {
     u64 empty, tobits, to, men, king, kings;
 
-    listptr->bb = bb;
     empty = ALL50 - bb->white - bb->black;
 
     if (bb->side == W)
@@ -780,6 +779,7 @@ void gen_moves(bitboard *bb, movelist *listptr, lnlist *lnptr, bool genall)
     listptr->count = 0;
     listptr->npcapt = 0;
     listptr->lnptr = (lnentry *) lnptr;
+    listptr->bb = bb;
     genmoves_capt(bb, listptr);
 
     if (genall && listptr->count == 0)

@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
     printf("sizeof(long long)=%u\n", (u32) sizeof(long long));
     printf("sizeof(bitboard)=%u\n", (u32) sizeof(bitboard));
     printf("sizeof(movelist)=%u\n", (u32) sizeof(movelist));
+    printf("sizeof(lnlist)=%u\n", (u32) sizeof(lnlist));
     printf("sizeof(ttentry)=%u\n", (u32) sizeof(ttentry));
     printf("sizeof(featentry)=%u\n", (u32) sizeof(featentry));
     printf("sizeof feat=%u\n", (u32) sizeof feat);

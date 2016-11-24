@@ -34,7 +34,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -44,7 +43,6 @@
 #ifdef _WIN32
 #define IPV6STRICT
 #include <winsock2.h>
-typedef int (*__compar_fn_t) (const void *, const void *);
 #else
 #include <netdb.h>
 #include <netinet/in.h> 
@@ -239,6 +237,10 @@ typedef uint16_t u16;
 typedef uint8_t   u8;
 typedef u32     bool;
 
+#if !defined(__COMPAR_FN_T) && !defined(__compar_fn_t_defined)
+typedef int (*__compar_fn_t) (const void *, const void *);
+#endif
+
 #ifdef _MSC_VER
 #define popcount (int)__popcnt64 
 __inline static u32 __builtin_ctzll(u64 x) {u32 i; _BitScanForward64(&i, x); return i;}
@@ -253,8 +255,7 @@ __inline static u32 __builtin_clzll(u64 x) {u32 i; _BitScanReverse64(&i, x); ret
 #else
 /* POPCNT instruction is supported since the Intel "Nehalem" (Core i) */
 /* and AMD "Barcelona" (K10) processors. */
-/* Using GCC 4 intrinsic; compile also with -march=native. */
-/* (or -march=nehalem for GCC 4.9 and up) */ 
+/* Using GCC 4 intrinsic; compile also with -mpopcnt */
 #define popcount __builtin_popcountll
 #endif
 

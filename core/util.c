@@ -653,14 +653,14 @@ u32 get_tick(void)
 #ifdef _WIN32
     return timeGetTime();
 #else
-    struct timespec ts;
+    struct timeval tv;
 
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1)
+    if (gettimeofday(&tv, NULL) == -1)
     {
         perror("get_tick");
         return 0;
     }
-    return ts.tv_sec*1000 + ts.tv_nsec/1000000;
+    return tv.tv_sec*1000 + tv.tv_usec/1000;
 #endif
 }
 

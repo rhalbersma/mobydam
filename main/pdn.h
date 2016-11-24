@@ -17,5 +17,4 @@
     along with Moby Dam.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-extern void log_pdnmove(movelist *listptr, int mv);
 extern void log_pdnstartstop(bitboard *bb);

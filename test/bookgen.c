@@ -59,6 +59,7 @@ int pdn_pos;                    /* character position within current pdn line */
 /* returns: TRUE if successful */
 static bool add_bookmove(bitboard *mvptr, int nagcode)
 {
+    char mvstr[7];
     bitboard *bptr;
     movelist list;
     size_t b;
@@ -108,11 +109,8 @@ static bool add_bookmove(bitboard *mvptr, int nagcode)
         debugf("existing move found ");
     }
 
-    if (debug_info)
-    {
-        print_move(mvptr);
-    }
-    debugf("annot %d->%d\n", bptr->moveinfo, nagcode);
+    sprint_move(mvstr, mvptr);
+    debugf("%s annot %d->%d\n", mvstr, bptr->moveinfo, nagcode);
 
     if (annot_ignore || nagcode == 0)
     {
@@ -141,16 +139,19 @@ static bool add_bookmove(bitboard *mvptr, int nagcode)
                     }
                 }
             }
-            if (mvptr != NULL && bb_compare(mvptr, bptr) != EQUAL)
+            if (mvptr != NULL && bb_compare(mvptr, bptr) != EQUAL &&
+                mvptr->moveinfo == 3)
             {
                 if (annot_overwrite)
                 {
-                    mvptr->moveinfo = 0; /* clear conflicting value */
+                    debugf("clearing conflicting forced move annot 3\n");
+                    mvptr->moveinfo = 0;
                 }
                 else
                 {
-                    return TRUE; /* conflicting forced move found, */
-                }                /* don't annotate our newly added move */
+                    debugf("conflicting forced move annot 3 found\n");
+                    return TRUE; /* don't annotate our newly added move */
+                }
             }
         }
     }

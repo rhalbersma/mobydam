@@ -1,11 +1,10 @@
 CC=gcc
-#CFLAGS=-g -O3 -Wall -march=native -flto $(PROF) -DPF -DETC -DLMR -DKIL
-CFLAGS=-g -O3 -Wall -march=nehalem -flto $(PROF) -DPF -DETC -DLMR -DKIL
+CFLAGS=-g -O3 -Wall -mpopcnt -flto $(PROF) -DPF -DETC -DLMR -DKIL -DCUT
 # -D_DEBUG
-#CFLAGS=-g -O2 -Wall -march=native -flto $(PROF) -DPF -DETC -DLMR -DKIL
-#CFLAGS=-g -Wall -march=native -fno-inline -D_DEBUG -DPF -DETC -DLMR -DKIL
-#CFLAGS=-g -pg -O2 -Wall -march=native -fno-inline -DPF -DETC -DLMR -DKIL
-#CFLAGS=-g -Wall -march=native -fprofile-arcs -ftest-coverage
+#CFLAGS=-g -O2 -Wall -mpopcnt -flto $(PROF) -DPF -DETC -DLMR -DKIL -DCUT
+#CFLAGS=-g -Wall -mpopcnt -fno-inline -D_DEBUG -DPF -DETC -DLMR -DKIL -DCUT
+#CFLAGS=-g -pg -O2 -Wall -mpopcnt -fno-inline -DPF -DETC -DLMR -DKIL -DCUT
+#CFLAGS=-g -Wall -mpopcnt -fprofile-arcs -ftest-coverage
 
 VPATH = .:../core
 
@@ -34,4 +33,4 @@ clean:
 	rm -f mobydam mobydam.exe *.o *.gcda *.gcno gmon.out
 
 uno: $(SRCS)
-	uno -D_DEBUG -DPF -DETC -DLMR -DKIL $+
+	uno -D_DEBUG -DPF -DETC -DLMR -DKIL -DCUT $+

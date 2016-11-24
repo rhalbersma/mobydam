@@ -41,7 +41,7 @@ typedef struct {
     u64 empty;          /* during movegen: empty positions, including frombit */
     u64 oppbits;        /* during movegen: opponents at start of capture */
     u64 tp[32];         /* during movegen: turning points of capture */
-    bitboard *bb;       /* during movegen: ptr to old board */
+    bitboard *bb;       /* ptr to old board */
     lnentry *lnptr;     /* ptr to long notation array */
     bitboard move[128]; /* the new boards resulting from the moves */
 } movelist;

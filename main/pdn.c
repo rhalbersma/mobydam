@@ -22,10 +22,12 @@
 #include "main.h"
 
 bool pdnlog_inprog;           /* currently logging a game? */
-bitboard pdn_board;           /* game's initial board state */
 time_t pdn_start;             /* when the game started */
-char pdn_movetext[20000];     /* storing the played moves as text */
-char *pdn_moves;              /* where to write the next move text */
+
+/* scratch variables for write_pdnmoves (to save stack space) */
+movelist mv_list;             /* move list */
+lnlist mv_ln;                 /* long notation */
+char mv_str[210];             /* constructed string */
 
 /* escape special characters */
 /* dest -> destination string */
@@ -96,40 +98,6 @@ static void add_fen(char *fen, u64 pieces, u64 kings)
     *--fen = '\0';
 }
 
-/* log pdn move */
-/* must be called before the move is performed */
-/* listptr -> the list of valid moves, including the long move notation info */
-/* mv = index number of the move in the move list */
-void log_pdnmove(movelist *listptr, int mv)
-{
-    int m;
-
-    if (pdn_moves == pdn_movetext && pdn_board.side != W)
-    {
-        pdn_moves += sprintf(pdn_moves, "\n1... ");
-    }
-    if (side_moving == W)
-    {
-        pdn_moves += sprintf(pdn_moves, "\n%d. ", move_number);
-    }
-
-    for (m = 0; m < listptr->count; m++)
-    {
-        if (m != mv &&
-            move_square(&listptr->move[m], FROM) == 
-            move_square(&listptr->move[mv], FROM) &&
-            move_square(&listptr->move[m], TO) == 
-            move_square(&listptr->move[mv], TO))
-        {
-            /* short move notation is ambiguous, using long notation */
-            pdn_moves += sprint_move_long(pdn_moves, listptr, mv);
-            return;
-        }
-    }
-    /* we can use the short move notation, it is unambiguous */
-    pdn_moves += sprint_move(pdn_moves, &listptr->move[mv]);
-}
-
 /* recursive part of finding an n-ballot opening */
 /* startpos -> starting board position of game */
 /* bb -> current board */
@@ -179,8 +147,91 @@ static void find_opening(bitboard *startpos, int depth, char *descr)
     strcpy(descr, "?");
 }
 
+/* write moves to PDN file */
+/* fp = file pointer */
+/* bb -> current bitboard in move chain */
+/* returns: move number of the last written move */
+static int write_pdnmoves(FILE *fp, bitboard *bb)
+{
+    bitboard brd;
+    bitboard *parent;
+    int m, mv, movenr;
+    bool uselong;
+
+    parent = bb->parent;
+    if (parent == NULL)
+    {
+        /* reached the end (initial position) of the move chain */
+        init_board(&brd);
+        if (bb_compare(bb, &brd) != EQUAL)
+        {
+            /* not the starting position, write FEN */
+            strcpy(mv_str, (bb->side == W) ? "W:W" : "B:W");
+            add_fen(mv_str, bb->white, bb->kings);
+            strcat(mv_str, ":B");
+            add_fen(mv_str, bb->black, bb->kings);
+            fprintf(fp, "[FEN \"%s\"]\n", mv_str);
+
+            /* see if it was a standard n-ballot opening */
+            find_opening(bb, 3, mv_str);
+            strip_trailing(mv_str);
+        }
+        else
+        {
+            strcpy(mv_str, "?");
+        }
+        fprintf(fp, "[Event \"%s\"]\n", mv_str);
+
+        movenr = 0;
+        if (bb->side != W)
+        {
+            fprintf(fp, "\n1... ");
+            movenr = 1;
+        }
+    }
+    else
+    {
+        /* follow the move chain to write the preceding moves */
+        movenr = write_pdnmoves(fp, parent); /* recurse */
+
+        /* write the move number */
+        if (parent->side == W)
+        {
+            movenr++;
+            fprintf(fp, "\n%d. ", movenr);
+        }
+
+        gen_moves(parent, &mv_list, &mv_ln, TRUE); /* generate all moves */
+        uselong = FALSE;
+        mv = 0;
+        for (m = 0; m < mv_list.count; m++)
+        {
+            if (bb_compare(bb, &mv_list.move[m]) == EQUAL)
+            {
+                mv = m; /* save current move's index */
+            }
+            else if (move_square(bb, FROM) == move_square(&mv_list.move[m], FROM) &&
+                     move_square(bb, TO)   == move_square(&mv_list.move[m], TO))
+            {
+                /* short move notation is ambiguous, using long notation */
+                uselong = TRUE;
+            }
+        }
+        if (uselong)
+        {
+            sprint_move_long(mv_str, &mv_list, mv);
+        }
+        else
+        {
+            sprint_move(mv_str, bb);
+        }
+        fprintf(fp, "%s", mv_str);
+    }
+    return movenr;
+}
+
 /* do needed logging actions in case a game has started or stopped */
-/* bb -> current board */
+/* bb -> current bitboard in move chain */
 void log_pdnstartstop(bitboard *bb)
 {
     FILE *fp;
@@ -188,18 +239,14 @@ void log_pdnstartstop(bitboard *bb)
     char hostname[33];
     char eng[65], opp[65], nrmoves[10];
     char *result;
-    char fen[210];
     struct tm *tmptr;
     int used;
-    bitboard brd;
 
     if (game_inprog && !pdnlog_inprog)
     {
         /* game has just started */
 
-        pdn_board = *bb;        /* save starting board state */
         pdn_start = time(NULL); /* save start date and time */
-        pdn_moves = pdn_movetext;
         pdnlog_inprog = TRUE;
     }
 
@@ -277,23 +324,9 @@ void log_pdnstartstop(bitboard *bb)
 
         fprintf(fp, "[GameType \"20\"]\n");
 
-        strcpy(eng, "?");
-        init_board(&brd);
-        if (bb_compare(&pdn_board, &brd) != EQUAL)
-        {
-            strcpy(fen, (pdn_board.side == W) ? "W:W" : "B:W");
-            add_fen(fen, pdn_board.white, pdn_board.kings);
-            strcat(fen, ":B");
-            add_fen(fen, pdn_board.black, pdn_board.kings);
-            fprintf(fp, "[FEN \"%s\"]\n", fen);
+        write_pdnmoves(fp, bb);
+        fprintf(fp, "\n%s\n\n", result);
 
-            find_opening(&pdn_board, 3, eng);
-            strip_trailing(eng);
-        }
-        fprintf(fp, "[Event \"%s\"]\n", eng);
-
-        pdn_moves += sprintf(pdn_moves, "\n%s\n\n", result);
-        fwrite(pdn_movetext, sizeof(char), pdn_moves - pdn_movetext, fp);
         fclose(fp);
         pdnlog_inprog = FALSE;
     }

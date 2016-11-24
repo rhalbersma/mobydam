@@ -335,6 +335,22 @@ static s32 pv_search(bitboard *bb, int ply, int depth, s32 alpha, s32 beta)
         return eval_board(bb);
     }
 
+#ifdef CUT
+    /* bad move pruning; poor man's ProbCut in the style of Scan 2.0 */
+    m = VAL_MAN*9/10; /* margin */
+
+    /* not too close to leaf depth, non-pv node, not in opening, no db win */
+    if (depth > 2 && alpha + 1 == beta &&
+        game_phase(pcnt) != 0 && beta < INFIN - MAXPLY - m)
+    {
+        best = pv_search(bb, ply, depth/2, beta + m - 1, beta + m);
+        if (best >= beta + m)
+        {
+            return beta; /* fail-hard seems to work best here */
+        }
+    }
+#endif
+
     d = depth;
     if (list.count > 1)
     {
@@ -404,7 +420,8 @@ static s32 pv_search(bitboard *bb, int ply, int depth, s32 alpha, s32 beta)
         if (m >= 3 && alpha + 1 == beta && d > 2 && pcnt >= 8)
         {
             /* reduced depth zero width window search */
-            merit = -pv_search(&list.move[m], ply + 1, d - 1, -alpha - 1, -alpha);
+            merit = -pv_search(&list.move[m], ply + 1, d - 1 - (m >= 6), 
+                               -alpha - 1, -alpha);
 
             /* check for engine event received at greater depth */
             if (main_event.any)
@@ -947,14 +964,6 @@ bool engine_ponder(bitboard *bb, int maxdepth)
     }
     start_tick = last_tick = get_tick();
     fade_hist();
-
-    /* clear statistics counts */
-    node_count = nonleaf_count = 0;
-    ttprobe_count = tthit_count = ttbest_count = 0;
-    etctst_count = etchit_count = etccut_count = 0;
-    end_acc[0] = end_acc[2] = end_acc[3] = 0;
-    end_acc[4] = end_acc[5] = end_acc[6] = 0;
-    eval_count = 0;
     memset(killer_list, 0, sizeof killer_list);
 
     /* may cutoff at any 5- or 6-pc win/loss position encountered */

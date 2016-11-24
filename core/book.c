@@ -115,7 +115,7 @@ bool get_bookmove(movelist *listptr)
     }
 
     /* find current board position in the book */
-    bptr = (bitboard *) bsearch(listptr->move[0].parent, book_positions,
+    bptr = (bitboard *) bsearch(listptr->bb, book_positions,
                                 book_size, sizeof(bitboard),
                                 (__compar_fn_t) bb_compare);
     if (bptr == NULL)

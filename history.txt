@@ -1,0 +1,15 @@
+Moby Dam History
+
+
+2015-07-05 initial release, 18th Computer Olympiad version.
+Open Source (GPL v3.0).
+Compiles and runs on Linux and Windows 64-bit systems.
+The processor must support the POPCNT instruction.
+Single-threaded (no multi-core parallel search yet).
+Uses the 2-6 piece endgame databases.
+
+2016-07-03 second release, 19th Computer Olympiad version.
+Support Visual Studio 2015.
+Added DXP BACKREQ (take back move) support.
+Fixed opponent's move count in the log.
+Increased strength of play by adding bad move pruning a la Scan.

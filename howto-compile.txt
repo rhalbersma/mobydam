@@ -11,5 +11,5 @@ Compiling Moby Dam in Windows
   If you use Mingw-w64:
   In the 'main' subdirectory, give command 'make win'.
 
-  If you use Visual Studio Express 2013:
+  If you use Visual Studio Express 2015:
   In the 'win' subdirectory, doubleclick 'mobydam.sln'.

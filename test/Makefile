@@ -1,9 +1,9 @@
 CC = gcc
-CFLAGS=-g -O2 -Wall -march=native -flto
-#CFLAGS=-g -Wall -march=native -D_DEBUG
-#CFLAGS=-g -pg -O2 -Wall -march=native -fno-inline -D_DEBUG
-#CFLAGS=-g -pg -Wall -march=native -fno-inline -D_DEBUG
-#CFLAGS=-g -Wall -march=native -fprofile-arcs -ftest-coverage -D_DEBUG
+CFLAGS=-g -O2 -Wall -mpopcnt -flto -D_DEBUG
+#CFLAGS=-g -Wall -mpopcnt -D_DEBUG
+#CFLAGS=-g -pg -O2 -Wall -mpopcnt -fno-inline -D_DEBUG
+#CFLAGS=-g -pg -Wall -mpopcnt -fno-inline -D_DEBUG
+#CFLAGS=-g -Wall -mpopcnt -fprofile-arcs -ftest-coverage -D_DEBUG
 
 VPATH = .:../core
 
@@ -12,11 +12,11 @@ SRCS = book.c break.c end.c eval.c move.c tt.c util.c
 OBJS = book.o break.o end.o eval.o move.o tt.o util.o 
 HDRS = book.h break.h end.h eval.h move.h tt.h util.h core.h test.h Makefile
 
-lin: movegen perft perftval val sizes fen2dxp endver mm bookgen
-win: movegen.exe perft.exe perftval.exe val.exe sizes.exe fen2dxp.exe endver.exe mm.exe bookgen.exe
+lin: movegen perft perftval val sizes fen2dxp endver mm bookgen bookdump
+win: movegen.exe perft.exe perftval.exe val.exe sizes.exe fen2dxp.exe endver.exe mm.exe bookgen.exe bookdump.exe
 
 $(OBJS): $(HDRS)
-gen.o perft.o perftval.o val.o sizes.o fen2dxp.o endver.o mm.o bookgen.o: $(HDRS)
+gen.o perft.o perftval.o val.o sizes.o fen2dxp.o endver.o mm.o bookgen.o bookdump.o: $(HDRS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
@@ -51,8 +51,11 @@ mm.exe: mm.o util.o
 bookgen bookgen.exe: bookgen.o book.o move.o util.o
 	$(CC) $(CFLAGS) -o $@ $+
 
+bookdump bookdump.exe: bookdump.o book.o move.o util.o
+	$(CC) $(CFLAGS) -o $@ $+
+
 clean:
-	rm -f movegen perft perftval val sizes fen2dxp endver mm bookgen \
+	rm -f movegen perft perftval val sizes fen2dxp endver mm bookgen bookdump \
     *.o *.exe *.gcda *.gcno gmon.out
 
 uno: $(SRCS)
@@ -65,3 +68,4 @@ uno: $(SRCS)
 	uno -D_DEBUG endver.c $+
 	uno -D_DEBUG mm.c $+
 	uno -D_DEBUG bookgen.c $+
+	uno -D_DEBUG bookdump.c $+
