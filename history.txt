@@ -13,3 +13,8 @@ Support Visual Studio 2015.
 Added DXP BACKREQ (take back move) support.
 Fixed opponent's move count in the log.
 Increased strength of play by adding bad move pruning a la Scan.
+
+2019-05-19 third release, open Dutch championship computer draughts 2019.
+Made move generator faster when compiled with Visual Studio.
+Fixed killer moves by converting from position-based to from-to pair.
+Cleaned up function that writes PDN to file.

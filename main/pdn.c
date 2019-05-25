@@ -24,11 +24,6 @@
 bool pdnlog_inprog;           /* currently logging a game? */
 time_t pdn_start;             /* when the game started */
 
-/* scratch variables for write_pdnmoves (to save stack space) */
-movelist mv_list;             /* move list */
-lnlist mv_ln;                 /* long notation */
-char mv_str[210];             /* constructed string */
-
 /* escape special characters */
 /* dest -> destination string */
 /* src -> source string */
@@ -147,40 +142,86 @@ static void find_opening(bitboard *startpos, int depth, char *descr)
     strcpy(descr, "?");
 }
 
+/* write initial position to PDN file */
+/* fp = file pointer */
+/* bb -> initial position in move chain */
+static void write_pdninit(FILE *fp, bitboard *bb)
+{
+    bitboard brd;
+    char str[210];
+
+    init_board(&brd);
+    if (bb_compare(bb, &brd) != EQUAL)
+    {
+        /* not the starting position, write FEN */
+        strcpy(str, (bb->side == W) ? "W:W" : "B:W");
+        add_fen(str, bb->white, bb->kings);
+        strcat(str, ":B");
+        add_fen(str, bb->black, bb->kings);
+        fprintf(fp, "[FEN \"%s\"]\n", str);
+
+        /* see if it was a standard n-ballot opening */
+        find_opening(bb, 3, str);
+        strip_trailing(str);
+    }
+    else
+    {
+        strcpy(str, "?");
+    }
+    fprintf(fp, "[Event \"%s\"]\n", str);
+}
+
+/* write a move to PDN file */
+/* fp = file pointer */
+/* bb -> the move's bitboard in move chain */
+static void write_pdnmove(FILE *fp, bitboard *bb)
+{
+    int m, mv;
+    bool uselong;
+    movelist list;
+    lnlist longnotation;
+    char str[94];
+
+    gen_moves(bb->parent, &list, &longnotation, TRUE); /* generate all moves */
+    uselong = FALSE;
+    mv = 0;
+    for (m = 0; m < list.count; m++)
+    {
+        if (bb_compare(bb, &list.move[m]) == EQUAL)
+        {
+            mv = m; /* save current move's index */
+        }
+        else if (move_square(bb, FROMTO) == move_square(&list.move[m], FROMTO))
+        {
+            /* short move notation is ambiguous, using long notation */
+            uselong = TRUE;
+        }
+    }
+    if (uselong)
+    {
+        sprint_move_long(str, &list, mv);
+    }
+    else
+    {
+        sprint_move(str, bb);
+    }
+    fprintf(fp, "%s", str);
+}
+
 /* write moves to PDN file */
 /* fp = file pointer */
 /* bb -> current bitboard in move chain */
 /* returns: move number of the last written move */
 static int write_pdnmoves(FILE *fp, bitboard *bb)
 {
-    bitboard brd;
     bitboard *parent;
-    int m, mv, movenr;
-    bool uselong;
+    int movenr;
 
     parent = bb->parent;
     if (parent == NULL)
     {
         /* reached the end (initial position) of the move chain */
-        init_board(&brd);
-        if (bb_compare(bb, &brd) != EQUAL)
-        {
-            /* not the starting position, write FEN */
-            strcpy(mv_str, (bb->side == W) ? "W:W" : "B:W");
-            add_fen(mv_str, bb->white, bb->kings);
-            strcat(mv_str, ":B");
-            add_fen(mv_str, bb->black, bb->kings);
-            fprintf(fp, "[FEN \"%s\"]\n", mv_str);
-
-            /* see if it was a standard n-ballot opening */
-            find_opening(bb, 3, mv_str);
-            strip_trailing(mv_str);
-        }
-        else
-        {
-            strcpy(mv_str, "?");
-        }
-        fprintf(fp, "[Event \"%s\"]\n", mv_str);
+        write_pdninit(fp, bb);
 
         movenr = 0;
         if (bb->side != W)
@@ -191,7 +232,7 @@ static int write_pdnmoves(FILE *fp, bitboard *bb)
     }
     else
     {
-        /* follow the move chain to write the preceding moves */
+        /* follow the move chain to write the preceding moves first */
         movenr = write_pdnmoves(fp, parent); /* recurse */
 
         /* write the move number */
@@ -201,31 +242,7 @@ static int write_pdnmoves(FILE *fp, bitboard *bb)
             fprintf(fp, "\n%d. ", movenr);
         }
 
-        gen_moves(parent, &mv_list, &mv_ln, TRUE); /* generate all moves */
-        uselong = FALSE;
-        mv = 0;
-        for (m = 0; m < mv_list.count; m++)
-        {
-            if (bb_compare(bb, &mv_list.move[m]) == EQUAL)
-            {
-                mv = m; /* save current move's index */
-            }
-            else if (move_square(bb, FROM) == move_square(&mv_list.move[m], FROM) &&
-                     move_square(bb, TO)   == move_square(&mv_list.move[m], TO))
-            {
-                /* short move notation is ambiguous, using long notation */
-                uselong = TRUE;
-            }
-        }
-        if (uselong)
-        {
-            sprint_move_long(mv_str, &mv_list, mv);
-        }
-        else
-        {
-            sprint_move(mv_str, bb);
-        }
-        fprintf(fp, "%s", mv_str);
+        write_pdnmove(fp, bb);
     }
     return movenr;
 }

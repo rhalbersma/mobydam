@@ -51,7 +51,7 @@ u64 moves_generated;    /* nr. of moves generated */
 __inline__
 static void addlist_capt(movelist *listptr, u64 pcbit, u64 captbits, int type)
 {
-    bitboard move;
+    bitboard *mvptr;
     bitboard *bb;
     int i, npcapt;
 
@@ -72,33 +72,35 @@ static void addlist_capt(movelist *listptr, u64 pcbit, u64 captbits, int type)
 
     bb = listptr->bb; /* the parent bitboard */
 
+    mvptr = &listptr->move[listptr->count];
+
     /* construct the move's resulting bitboard */
     if (bb->side == W)
     {
-        move.side = B;
-        move.white = bb->white - listptr->frombit + pcbit;
-        move.black = bb->black - captbits;
+        mvptr->side = B;
+        mvptr->white = bb->white - listptr->frombit + pcbit;
+        mvptr->black = bb->black - captbits;
         if (type == M)
         {
             /* remove any captured kings and do promotion */
-            move.kings = (bb->kings & ~captbits) | (pcbit & ROW1);
+            mvptr->kings = (bb->kings & ~captbits) | (pcbit & ROW1);
         }
     }
     else
     {
-        move.side = W;
-        move.white = bb->white - captbits;
-        move.black = bb->black - listptr->frombit + pcbit;
+        mvptr->side = W;
+        mvptr->white = bb->white - captbits;
+        mvptr->black = bb->black - listptr->frombit + pcbit;
         if (type == M)
         {
             /* remove any captured kings and do promotion */
-            move.kings = (bb->kings & ~captbits) | (pcbit & ROW10);
+            mvptr->kings = (bb->kings & ~captbits) | (pcbit & ROW10);
         }
     }
     if (type == K)
     {
-        /* update moving king and remove any captured kings */
-        move.kings = (bb->kings & ~captbits) - listptr->frombit + pcbit;
+        /* remove any captured kings and update moving king */
+        mvptr->kings = (bb->kings & ~captbits) - listptr->frombit + pcbit;
     }
 
     if (npcapt >= 4)
@@ -106,8 +108,8 @@ static void addlist_capt(movelist *listptr, u64 pcbit, u64 captbits, int type)
         /* check for duplicate (only the order of captures is different) */
         for (i = 0; i < listptr->count; i++)
         {
-            if (listptr->move[i].white == move.white &&
-                listptr->move[i].black == move.black)
+            if (listptr->move[i].white == mvptr->white &&
+                listptr->move[i].black == mvptr->black)
             {
                 return;
             }
@@ -115,13 +117,10 @@ static void addlist_capt(movelist *listptr, u64 pcbit, u64 captbits, int type)
     }
 
     /* link to parent board */
-    move.parent = bb;
+    mvptr->parent = bb;
 
     /* draw info: capture = non-zero, also for print_move when from=to */
-    move.moveinfo = conv_to_square(pcbit);
-
-    /* add the move to the list */
-    listptr->move[listptr->count] = move;
+    mvptr->moveinfo = conv_to_square(pcbit);
 
     /* provide long notation if requested */
     if (listptr->lnptr != NULL)
@@ -522,7 +521,6 @@ static void genmoves_capt(bitboard *bb, movelist *listptr)
 /* listptr -> move list structure being constructed */
 static void genmoves_noncapt(bitboard *bb, movelist *listptr)
 {
-    bitboard move;
     bitboard *mvptr;
     u64 tobits, to, from, empty, men, kings;
     int m;
@@ -530,15 +528,9 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
     mvptr = listptr->move;
     empty = ALL50 - bb->white - bb->black;
 
-    /* link to parent board */
-    move.parent = bb;
-
     if (bb->side == W)
     {
         men = bb->white & ~bb->kings;
-        move.black = bb->black;
-        move.side = B;
-        move.moveinfo = 1; /* draw info: it's a man move */
 
         /* for each 'north' direction, find the set of */
         /* white men that have an adjacent empty square */
@@ -548,9 +540,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
         {
             to = tobits & -tobits;
             tobits -= to;
-            move.white = bb->white - (to << 6) + to;
-            move.kings = bb->kings | (to & ROW1); /* promotion */
-            *mvptr++ = move;
+            mvptr->white = bb->white - (to << 6) + to;
+            mvptr->black = bb->black;
+            mvptr->kings = bb->kings | (to & ROW1); /* promotion */
+            mvptr->side = B;
+            mvptr->moveinfo = 1; /* draw info: it's a man move */
+            mvptr->parent = bb;  /* link to parent board */
+            mvptr++;
         }
 
         tobits = (men >> 5) & empty; /* ne */
@@ -558,16 +554,18 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
         {
             to = tobits & -tobits;
             tobits -= to;
-            move.white = bb->white - (to << 5) + to;
-            move.kings = bb->kings | (to & ROW1); /* promotion */
-            *mvptr++ = move;
+            mvptr->white = bb->white - (to << 5) + to;
+            mvptr->black = bb->black;
+            mvptr->kings = bb->kings | (to & ROW1); /* promotion */
+            mvptr->side = B;
+            mvptr->moveinfo = 1; /* draw info: it's a man move */
+            mvptr->parent = bb;  /* link to parent board */
+            mvptr++;
         }
 
         kings = bb->white & bb->kings;
         if (kings != 0)
         {
-            move.moveinfo = 0; /* draw info: it's a king move */
-
             /* for each direction, find the set of white kings */
             /* that have an adjacent empty square */
 
@@ -579,9 +577,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to << 6);
                 do
                 {
-                    move.white = bb->white - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white - from + to;
+                    mvptr->black = bb->black;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = B;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to >> 6) & empty;
                 } while (to != 0);
@@ -595,9 +597,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to << 5);
                 do
                 {
-                    move.white = bb->white - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white - from + to;
+                    mvptr->black = bb->black;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = B;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to >> 5) & empty;
                 } while (to != 0);
@@ -611,9 +617,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to >> 5);
                 do
                 {
-                    move.white = bb->white - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white - from + to;
+                    mvptr->black = bb->black;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = B;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to << 5) & empty;
                 } while (to != 0);
@@ -627,9 +637,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to >> 6);
                 do
                 {
-                    move.white = bb->white - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white - from + to;
+                    mvptr->black = bb->black;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = B;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to << 6) & empty;
                 } while (to != 0);
@@ -639,9 +653,6 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
     else
     {
         men = bb->black & ~bb->kings;
-        move.white = bb->white;
-        move.side = W;
-        move.moveinfo = 1; /* draw info: it's a man move */
 
         /* for each 'south' direction, find the set of */
         /* black men that have an adjacent empty square */
@@ -651,9 +662,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
         {
             to = tobits & -tobits;
             tobits -= to;
-            move.black = bb->black - (to >> 5) + to;
-            move.kings = bb->kings | (to & ROW10); /* promotion */
-            *mvptr++ = move;
+            mvptr->white = bb->white;
+            mvptr->black = bb->black - (to >> 5) + to;
+            mvptr->kings = bb->kings | (to & ROW10); /* promotion */
+            mvptr->side = W;
+            mvptr->moveinfo = 1; /* draw info: it's a man move */
+            mvptr->parent = bb;  /* link to parent board */
+            mvptr++;
         }
 
         tobits = (men << 6) & empty; /* se */
@@ -661,16 +676,18 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
         {
             to = tobits & -tobits;
             tobits -= to;
-            move.black = bb->black - (to >> 6) + to;
-            move.kings = bb->kings | (to & ROW10); /* promotion */
-            *mvptr++ = move;
+            mvptr->white = bb->white;
+            mvptr->black = bb->black - (to >> 6) + to;
+            mvptr->kings = bb->kings | (to & ROW10); /* promotion */
+            mvptr->side = W;
+            mvptr->moveinfo = 1; /* draw info: it's a man move */
+            mvptr->parent = bb;  /* link to parent board */
+            mvptr++;
         }
 
         kings = bb->black & bb->kings;
         if (kings != 0)
         {
-            move.moveinfo = 0; /* draw info: it's a king move */
-
             /* for each direction, find the set of black kings */
             /* that have an adjacent empty square */
 
@@ -682,9 +699,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to << 6);
                 do
                 {
-                    move.black = bb->black - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white;
+                    mvptr->black = bb->black - from + to;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = W;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to >> 6) & empty;
                 } while (to != 0);
@@ -698,9 +719,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to << 5);
                 do
                 {
-                    move.black = bb->black - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white;
+                    mvptr->black = bb->black - from + to;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = W;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to >> 5) & empty;
                 } while (to != 0);
@@ -714,9 +739,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to >> 5);
                 do
                 {
-                    move.black = bb->black - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white;
+                    mvptr->black = bb->black - from + to;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = W;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to << 5) & empty;
                 } while (to != 0);
@@ -730,9 +759,13 @@ static void genmoves_noncapt(bitboard *bb, movelist *listptr)
                 from = (to >> 6);
                 do
                 {
-                    move.black = bb->black - from + to;
-                    move.kings = bb->kings - from + to;
-                    *mvptr++ = move;
+                    mvptr->white = bb->white;
+                    mvptr->black = bb->black - from + to;
+                    mvptr->kings = bb->kings - from + to;
+                    mvptr->side = W;
+                    mvptr->moveinfo = 0; /* draw info: it's a king move */
+                    mvptr->parent = bb;  /* link to parent board */
+                    mvptr++;
                     /* more empty squares beyond? */
                     to = (to << 6) & empty;
                 } while (to != 0);

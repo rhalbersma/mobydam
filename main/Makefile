@@ -10,7 +10,7 @@ VPATH = .:../core
 
 SRCS = dxp.c pdn.c search.c move.c book.c break.c end.c eval.c tt.c util.c 
 OBJS = dxp.o pdn.o search.o move.o book.o break.o end.o eval.o tt.o util.o 
-HDRS = dxp.h pdn.h search.h move.h book.h break.h end.h eval.h tt.h util.h core.h dxp.h pdn.h search.h main.h Makefile
+HDRS = dxp.h pdn.h search.h move.h book.h break.h end.h eval.h tt.h util.h core.h main.h Makefile
 
 lin: mobydam
 win: mobydam.exe

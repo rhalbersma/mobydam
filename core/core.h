@@ -70,8 +70,9 @@ typedef int SOCKET;
 #define KB 3
 
 /* from- or to-square selector */
-#define FROM 0
-#define TO   1
+#define FROM   0
+#define TO     1
+#define FROMTO 2
 
 /* ghost squares */
 #define G1 (1ULL << 10)

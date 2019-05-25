@@ -293,8 +293,8 @@ u64 move_captbits(bitboard *mvptr)
 /* a move is represented by its resulting bitboard; to find the */
 /* from- and to-squares, compare new bitboard with parent bitboard */
 /* mvptr -> move structure */
-/* fromto = FROM or TO */
-/* returns: square number */
+/* fromto = FROM or TO or FROMTO */
+/* returns: square number, or 51*from + to pair */
 int move_square(bitboard *mvptr, int fromto)
 {
     bitboard *bb;
@@ -302,34 +302,57 @@ int move_square(bitboard *mvptr, int fromto)
     bb = mvptr->parent;
     if (bb->side == W)
     {
-        if (bb->white == mvptr->white)
+        if (bb->white == mvptr->white) /* special case, from=to */
         {
-            /* special case, from=to */
-            return mvptr->moveinfo;
+            if (fromto == FROMTO)
+            {
+                return 52*mvptr->moveinfo; /* as pair */
+            }
+            else
+            {
+                return mvptr->moveinfo; /* FROM or TO */
+            }
         }
         if (fromto == FROM)
         {
             return conv_to_square(bb->white & ~mvptr->white);
         }
-        else
+        else if (fromto == TO)
         {
             return conv_to_square(mvptr->white & ~bb->white);
+        }
+        else /* FROMTO */
+        {
+            return 51*conv_to_square(bb->white & ~mvptr->white) +
+                      conv_to_square(mvptr->white & ~bb->white);
         }
     }
     else
     {
-        if (bb->black == mvptr->black)
+        if (bb->black == mvptr->black) /* special case, from=to */
+
         {
-            /* special case, from=to */
-            return mvptr->moveinfo;
+            if (fromto == FROMTO)
+            {
+                return 52*mvptr->moveinfo; /* as pair */
+            }
+            else
+            {
+                return mvptr->moveinfo; /* FROM or TO */
+            }
         }
         if (fromto == FROM)
         {
             return conv_to_square(bb->black & ~mvptr->black);
         }
-        else
+        else if (fromto == TO)
         {
             return conv_to_square(mvptr->black & ~bb->black);
+        }
+        else /* FROMTO */
+        {
+            return 51*conv_to_square(bb->black & ~mvptr->black) +
+                      conv_to_square(mvptr->black & ~bb->black);
         }
     }
 }
@@ -455,6 +478,7 @@ void print_board(bitboard *bb)
 /* ply = current search ply depth, 0 = not in search */
 /* out: descr -> string to receive description of the applicable draw rule, */
 /*               or NULL */
+/* returns: TRUE if draw */
 bool is_draw(bitboard *startbb, int ply, char *descr)
 {
     bitboard *bb;

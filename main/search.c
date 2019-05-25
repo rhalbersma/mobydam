@@ -27,12 +27,12 @@ typedef struct {               /* set of board positions */
 } poslist;
 
 typedef struct {               /* killer store per ply */
-    u64 k1;
-    u64 k2;
+    int k1;
+    int k2;
 } kilst;
 
 kilst killer_list[MAXPLY + 1]; /* killer store for all plies */
-u32 good_hist[51][64];         /* history of good moves */
+u32 good_hist[51*51];          /* history of good moves */
 
 s32 iter0_score;               /* static root value before iterations start */
 int max_ply;                   /* maximum ply to search */
@@ -70,7 +70,7 @@ static void fade_hist(void)
     {
         for (j = 1; j <= 50; j++)
         {
-            good_hist[i][j] >>= 3;
+            good_hist[51*i + j] >>= 3;
         }
     }
 }
@@ -86,7 +86,7 @@ __inline__
 static void sort_moves(movelist *listptr, int d, u64 bestmove, kilst *kilptr)
 {
     bitboard move;
-    u64 thismove;
+    int fromto;
     int m, mtt = -1;
 #ifdef KIL
     int mk1 = -1, mk2 = -1;
@@ -98,19 +98,22 @@ static void sort_moves(movelist *listptr, int d, u64 bestmove, kilst *kilptr)
         /* find the indexes of the interesting moves */
         for (m = 0; m < listptr->count; m++)
         {
-            thismove = listptr->move[m].white | listptr->move[m].black;
-            if (thismove == bestmove)
+            if (bestmove == (listptr->move[m].white | listptr->move[m].black))
             {
                 mtt = m;
             }
 #ifdef KIL
-            else if (thismove == kilptr->k1)
+            else 
             {
-                mk1 = m;
-            }
-            else if (thismove == kilptr->k2)
-            {
-                mk2 = m;
+                fromto = move_square(&listptr->move[m], FROMTO);
+                if (fromto == kilptr->k1)
+                {
+                    mk1 = m;
+                }
+                else if (fromto == kilptr->k2)
+                {
+                    mk2 = m;
+                }
             }
 #endif
         }
@@ -178,8 +181,8 @@ static void sort_moves(movelist *listptr, int d, u64 bestmove, kilst *kilptr)
             /* first make the good_hist scores fast to access */
             for (i = m; i < listptr->count; i++)
             {
-                gh[i] = good_hist[move_square(&listptr->move[i], FROM)]
-                                 [move_square(&listptr->move[i], TO)];
+                fromto = move_square(&listptr->move[i], FROMTO);
+                gh[i] = good_hist[fromto];
             }
             /* do insertion sort, is fast for small number of moves */
             for (i = m + 1; i < listptr->count; i++)
@@ -214,6 +217,7 @@ static s32 pv_search(bitboard *bb, int ply, int depth, s32 alpha, s32 beta)
     u64 bestmove;
     s32 origalpha, best, merit;
     int d, m, bestm, pcnt;
+    int fromto;
 
     debugf("pv_search enter ply=%d depth=%d side=%d\n",
            ply, depth, bb->side);
@@ -474,17 +478,17 @@ static s32 pv_search(bitboard *bb, int ply, int depth, s32 alpha, s32 beta)
         }
     }
 
-    /* collapse the best move (to save space in the tt) */
-    bestmove = list.move[bestm].white | list.move[bestm].black;
+    fromto = move_square(&list.move[bestm], FROMTO);
 
 #ifdef KIL
     if (best >= beta && list.count > 1)
     {
+
         /* save as a killer */
-        if (killer_list[ply].k1 != bestmove)
+        if (killer_list[ply].k1 != fromto)
         {
             killer_list[ply].k2 = killer_list[ply].k1;
-            killer_list[ply].k1 = bestmove;
+            killer_list[ply].k1 = fromto;
         }
     }
 #endif
@@ -492,13 +496,14 @@ static s32 pv_search(bitboard *bb, int ply, int depth, s32 alpha, s32 beta)
     if (depth > 1 && best > origalpha)
     {
         /* save in history of good moves */
-        good_hist[move_square(&list.move[bestm], FROM)]
-                 [move_square(&list.move[bestm], TO)]
-            += (depth - 1)*(depth - 1);
+        good_hist[fromto] += (depth - 1)*(depth - 1);
     }
 
     if (depth > 0)
     {
+        /* collapse the best move (to save space in the tt) */
+        bestmove = list.move[bestm].white | list.move[bestm].black;
+
         /* save score and move in transposition table */
         store_tt(bb, ply, depth, origalpha, beta, best, bestmove);
     }
